@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Priority Task Scheduler - Web Version</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        #output { background: #212529; color: #00ff66; padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Priority Scheduler (Binary Heap)</h2>
+        <label>Task Name:</label>
+        <input type="text" id="taskName" placeholder="e.g., Database Backup">
+        
+        <label>Priority (Higher = more urgent):</label>
+        <input type="number" id="taskPriority" value="1" min="0">
+        
+        <label>Burst Duration:</label>
+        <input type="number" id="taskBurst" value="1" min="1">
+        
+        <button onclick="addTask()">Add Task to Scheduler</button>
+        <button onclick="runScheduler()" style="background: #28a745;">Run All Tasks</button>
+    </div>
+
+    <div class="card">
+        <h3>Execution Console</h3>
+        <div id="output">System ready. Add tasks and click 'Run All Tasks'.</div>
+    </div>
+
+    <script>
+        // --- Core Task & Heap Logic from your project ---
+        class Task {
+            static seq = 0;
+            constructor(name, priority, burst = 1) {
+                this.name = name;
+                this.priority = priority;
+                this.burst = burst;
+                this.seq = ++Task.seq;
+                this.idx = -1;
+            }
+            key() { return [-this.priority, this.seq]; }
+        }
+
+        const less = (a, b) => {
+            const [a0, a1] = a.key(), [b0, b1] = b.key();
+            return a0 < b0 || (a0 === b0 && a1 < b1);
+        };
+
+        class HeapScheduler {
+            constructor() { this.a = []; }
+            get length() { return this.a.length; }
+            _swap(i, j) {
+                const a = this.a;
+                [a[i], a[j]] = [a[j], a[i]];
+                a[i].idx = i; a[j].idx = j;
+            }
+            _up(i) {
+                while (i > 0) {
+                    const p = (i - 1) >> 1;
+                    if (less(this.a[i], this.a[p])) { this._swap(i, p); i = p; } else break;
+                }
+            }
+            _down(i) {
+                const n = this.a.length;
+                for (;;) {
+                    const l = 2 * i + 1, r = 2 * i + 2;
+                    let s = i;
+                    if (l < n && less(this.a[l], this.a[s])) s = l;
+                    if (r < n && less(this.a[r], this.a[s])) s = r;
+                    if (s === i) return;
+                    this._swap(i, s);
+                    i = s;
+                }
+            }
+            insert(t) {
+                t.idx = this.a.length;
+                this.a.push(t);
+                this._up(t.idx);
+            }
+            extract() {
+                if (!this.a.length) return null;
+                const top = this.a[0], last = this.a.pop();
+                if (this.a.length) { this.a[0] = last; last.idx = 0; this._down(0); }
+                top.idx = -1;
+                return top;
+            }
+        }
+
+        // --- Web UI Controller ---
+        const scheduler = new HeapScheduler();
+        let logBox = document.getElementById("output");
+
+        function log(text) {
+            logBox.textContent += "\n" + text;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function addTask() {
+            let name = document.getElementById("taskName").value.trim();
+            let priority = parseInt(document.getElementById("taskPriority").value);
+            let burst = parseInt(document.getElementById("taskBurst").value);
+
+            if (!name) { alert("Please enter a task name"); return; }
+
+            scheduler.insert(new Task(name, priority, burst));
+            log(`Added: [${name}] with Priority: ${priority}`);
+            
+            // Reset input fields
+            document.getElementById("taskName").value = "";
+            document.getElementById("taskPriority").value = "1";
+            document.getElementById("taskBurst").value = "1";
+        }
+
+        function runScheduler() {
+            if (scheduler.length === 0) {
+                log("No tasks in the queue to run!");
+                return;
+            }
+            log("\n--- Executing Tasks by Priority ---");
+            while (scheduler.length > 0) {
+                let t = scheduler.extract();
+                log(`> Executing: ${t.name} (Priority: ${t.priority}, Burst: ${t.burst})`);
+            }
+            log("--- All tasks completed ---\n");
+            Task.seq = 0; // reset sequence counter
+        }
+    </script>
+</body>
+</html>
+
